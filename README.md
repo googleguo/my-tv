@@ -88,4 +88,4 @@ adb install my-tv.apk
 
 ## 赞赏
 
-![image](./screenshots/appreciate.jpeg)
+![image](https://www.51cy.top/chatgpt/customer/mp2.jpg)

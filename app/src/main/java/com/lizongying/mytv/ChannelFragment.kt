@@ -30,7 +30,7 @@ class ChannelFragment : Fragment() {
     fun show(tvViewModel: TVViewModel) {
         handler.removeCallbacks(hideRunnable)
         handler.removeCallbacks(playRunnable)
-        binding.channelContent.text = (tvViewModel.id.value?.plus(1)).toString()
+        binding.channelContent.text = (tvViewModel.getTV().id.plus(1)).toString()
         view?.visibility = View.VISIBLE
         handler.postDelayed(hideRunnable, delay)
     }
@@ -45,6 +45,13 @@ class ChannelFragment : Fragment() {
             handler.postDelayed(playRunnable, delay)
         } else {
             handler.postDelayed(playRunnable, 0)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (view?.visibility == View.VISIBLE) {
+            handler.postDelayed(hideRunnable, delay)
         }
     }
 

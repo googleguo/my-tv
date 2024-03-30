@@ -1,15 +1,18 @@
 package com.lizongying.mytv.api
 
 import android.content.Context
-import android.content.SharedPreferences
+import android.util.Log
 import com.lizongying.mytv.Encryptor
 import com.lizongying.mytv.MainActivity
+import com.lizongying.mytv.SP
 import com.lizongying.mytv.Utils.getDateTimestamp
 import com.lizongying.mytv.models.TVViewModel
 import kotlin.math.floor
 import kotlin.random.Random
 
-class YSP(var context: Context) {
+object YSP {
+    private const val TAG = "YSP"
+
     private var cnlid = ""
 
     private var livepid = ""
@@ -50,23 +53,19 @@ class YSP(var context: Context) {
 
     private var signature = ""
 
-    private var encryptor: Encryptor? = null
-    private lateinit var sharedPref: SharedPreferences
+    private var appid = "ysp_pc"
+    var token = ""
 
-    init {
-        if (context is MainActivity) {
-            encryptor = Encryptor()
-            encryptor!!.init(context)
+    private var encryptor = Encryptor()
 
-            sharedPref = (context as MainActivity).sharedPref
-        }
-
+    fun init(context: Context) {
+        encryptor.init(context)
         guid = getGuid()
     }
 
     fun switch(tvModel: TVViewModel): String {
-        livepid = tvModel.pid.value!!
-        cnlid = tvModel.sid.value!!
+        livepid = tvModel.getTV().pid
+        cnlid = tvModel.getTV().sid
         defn = "fhd"
 
         randStr = getRand()
@@ -78,9 +77,22 @@ class YSP(var context: Context) {
         timeStr = getTimeStr()
 
         cKey =
-            encryptor!!.encrypt(cnlid, timeStr, appVer, guid, platform)
+            encryptor.encrypt(cnlid, timeStr, appVer, guid, platform)
         signature = getSignature()
         return """{"cnlid":"$cnlid","livepid":"$livepid","stream":"$stream","guid":"$guid","cKey":"$cKey","adjust":$adjust,"sphttps":"$sphttps","platform":"$platform","cmd":"$cmd","encryptVer":"$encryptVer","dtype":"$dtype","devid":"$devid","otype":"$otype","appVer":"$appVer","app_version":"$appVersion","rand_str":"$randStr","channel":"$channel","defn":"$defn","signature":"$signature"}"""
+    }
+
+    fun getAuthData(tvModel: TVViewModel): String {
+        livepid = tvModel.getTV().pid
+
+        randStr = getRand()
+
+        if (tvModel.retryTimes > 0) {
+            guid = newGuid()
+        }
+
+        signature = getAuthSignature()
+        return """pid=$livepid&guid=$guid&appid=$appid&rand_str=$randStr&signature=$signature"""
     }
 
     private fun getTimeStr(): String {
@@ -94,23 +106,17 @@ class YSP(var context: Context) {
     }
 
     fun getGuid(): String {
-        var guid = sharedPref.getString("guid", "")
-        if (guid == null || guid.length < 18) {
+        var guid = SP.guid
+        if (guid.length < 18) {
             guid = generateGuid()
-            with(sharedPref.edit()) {
-                putString("guid", guid)
-                apply()
-            }
+            SP.guid = guid
         }
         return guid
     }
 
     private fun newGuid(): String {
         guid = generateGuid()
-        with(sharedPref.edit()) {
-            putString("guid", guid)
-            apply()
-        }
+        SP.guid = guid
         return guid
     }
 
@@ -127,12 +133,14 @@ class YSP(var context: Context) {
     private fun getSignature(): String {
         val e =
             "adjust=${adjust}&appVer=${appVer}&app_version=$appVersion&cKey=$cKey&channel=$channel&cmd=$cmd&cnlid=$cnlid&defn=${defn}&devid=${devid}&dtype=${dtype}&encryptVer=${encryptVer}&guid=${guid}&livepid=${livepid}&otype=${otype}&platform=${platform}&rand_str=${randStr}&sphttps=${sphttps}&stream=${stream}".toByteArray()
-
-        val hashedData = encryptor?.hash(e) ?: return ""
+        val hashedData = encryptor.hash(e) ?: return ""
         return hashedData.let { it -> it.joinToString("") { "%02x".format(it) } }
     }
 
-    companion object {
-        private const val TAG = "YSP"
+    private fun getAuthSignature(): String {
+        val e =
+            "appid=${appid}&guid=${guid}&pid=${livepid}&rand_str=${randStr}".toByteArray()
+        val hashedData = encryptor.hash2(e) ?: return ""
+        return hashedData.let { it -> it.joinToString("") { "%02x".format(it) } }
     }
 }
